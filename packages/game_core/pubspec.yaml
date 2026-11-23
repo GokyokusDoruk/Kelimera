@@ -1,0 +1,10 @@
+name: game_core
+description: Kelimera oyun kuralları (saf Dart).
+version: 0.1.0
+publish_to: none
+
+environment:
+  sdk: ^3.6.0
+dev_dependencies:
+  lints: ^6.1.0
+  test: ^1.33.0
