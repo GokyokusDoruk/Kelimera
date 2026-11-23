@@ -186,6 +186,35 @@ void main() {
       expect(s.turnIndex, 0);
     });
 
+    test('herkes koparsa oyun bitmez, bekler; biri dönünce sıra ona geçer', () {
+      final e = engine();
+      var s = manual([ps('p1', hand), ps('p2', hand)]);
+      s = e.setStatus(s, 'p2', PlayerStatus.disconnected);
+      s = e.setStatus(s, 'p1', PlayerStatus.disconnected);
+      expect(s.finished, isFalse);
+      expect(s.round, 1);
+      expect(e.timeout(s), s);
+      s = e.setStatus(s, 'p2', PlayerStatus.connected);
+      expect(s.finished, isFalse);
+      expect(s.current.id, 'p2');
+      expect(s.round, 1);
+    });
+
+    test('bitmiş oyunda durum değişmez, kazanan listesi sabit kalır', () {
+      final s = manual([ps('p1', hand, score: 10), ps('p2', hand, score: 5)])
+          .copyWith(finished: true);
+      final after = engine().setStatus(s, 'p1', PlayerStatus.left);
+      expect(after, s);
+      expect(winnerIds(after), ['p1']);
+    });
+
+    test('ayrılan oyuncu geri bağlanamaz', () {
+      final e = engine();
+      var s = e.setStatus(three(), 'p3', PlayerStatus.left);
+      s = e.setStatus(s, 'p3', PlayerStatus.connected);
+      expect(s.players[2].status, PlayerStatus.left);
+    });
+
     test('tek kişi kalırsa oyun biter', () {
       final e = engine();
       var s = e.setStatus(three(), 'p2', PlayerStatus.left);

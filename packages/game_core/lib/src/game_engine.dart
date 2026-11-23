@@ -132,16 +132,22 @@ class GameEngine {
   GameState setStatus(GameState s, String playerId, PlayerStatus status) {
     final i = s.players.indexWhere((p) => p.id == playerId);
     if (i < 0) throw ArgumentError.value(playerId, 'playerId', 'Oyuncu yok');
+    // Bitmiş oyunda sonuç sabit kalır; ayrılan oyuncu geri dönemez (spec §5.10).
+    if (s.finished || s.players[i].status == PlayerStatus.left) return s;
     final next = s.copyWith(players: _replace(s.players, i, s.players[i].copyWith(status: status)));
-    if (next.finished) return next;
     if (_activeCount(next) < 2) return next.copyWith(finished: true);
-    if (i == s.turnIndex && status != PlayerStatus.connected) return _advance(next);
+    final currentAway = next.current.status != PlayerStatus.connected;
+    if (currentAway && (i == s.turnIndex || status == PlayerStatus.connected)) {
+      return _advance(next);
+    }
     return next;
   }
 
   /// Sırayı ilerletir; bağlı olmayan oyuncuları atlar; 5. tur bitince oyunu bitirir.
+  /// Bağlı hiç oyuncu yoksa durum değişmez: oyun geri dönen birini bekler.
   GameState _advance(GameState s) {
     if (_activeCount(s) < 2) return s.copyWith(finished: true);
+    if (s.players.every((p) => p.status != PlayerStatus.connected)) return s;
     var round = s.round;
     var idx = s.turnIndex;
     while (true) {

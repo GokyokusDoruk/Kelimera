@@ -21,6 +21,7 @@ void main() {
       final n = 2 + seed % 3;
       var s = e.start([for (var i = 0; i < n; i++) PlayerInfo(id: 'p$i', name: 'p$i', avatar: i)]);
       var steps = 0;
+      var advances = 0;
 
       while (!s.finished) {
         final before = s;
@@ -52,6 +53,7 @@ void main() {
           if (p.status != PlayerStatus.left) s = e.setStatus(s, p.id, status);
         }
         steps++;
+        if (s.round != before.round || s.turnIndex != before.turnIndex) advances++;
 
         for (final p in s.players) {
           expect(p.hand.length, 8, reason: 'seed $seed');
@@ -61,7 +63,9 @@ void main() {
         }
         expect(s.board.tiles.length, greaterThanOrEqualTo(before.board.tiles.length));
         expect(GameState.fromJson(jsonDecode(jsonEncode(s.toJson())) as Map<String, dynamic>), s);
-        expect(steps, lessThanOrEqualTo(n * totalRounds * 3), reason: 'seed $seed sonlanmadı');
+        // Her ilerleme en az bir sıra yuvasını tüketir; toplam yuva n × 5.
+        expect(advances, lessThanOrEqualTo(n * totalRounds), reason: 'seed $seed');
+        expect(steps, lessThan(100000), reason: 'seed $seed sonlanmadı');
       }
     }
     expect(acceptedMoves, greaterThan(1000));
