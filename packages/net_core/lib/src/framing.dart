@@ -49,6 +49,10 @@ class FrameAssembler {
       _id = id;
       _total = total;
       _parts.clear();
+    } else if (total != _total) {
+      _id = null;
+      _parts.clear();
+      throw const FormatException('Aynı mesajın parçalarında toplam uyuşmuyor');
     }
     _parts.putIfAbsent(index, () => Uint8List.sublistView(frame, frameHeaderSize));
     if (_parts.length < _total) return null;

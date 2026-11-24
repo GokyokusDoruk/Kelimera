@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:collection';
 
 sealed class HostEvent {
   const HostEvent();
@@ -53,18 +54,37 @@ abstract interface class ClientTransport {
 }
 
 /// Birden çok hakem taşıyıcısını tek taşıyıcı gibi gösterir; connId'lere `<anahtar>:` öneki ekler.
+///
+/// Olaylar bir kuyruktan sırayla yayınlanır: bir olay işlenirken bir parçadan gelen
+/// yeni olay (örneğin hakemin kendi oyuncusunun senkron cevabı) kuyruğa girer ve
+/// mevcut olay bittikten sonra aynı çağrı içinde yayınlanır.
 class MergedHostTransport implements HostTransport {
   final Map<String, HostTransport> parts;
   final _controller = StreamController<HostEvent>.broadcast(sync: true);
+  final Queue<HostEvent> _queue = Queue();
+  bool _draining = false;
 
   MergedHostTransport(this.parts) {
     for (final e in parts.entries) {
       final p = '${e.key}:';
-      e.value.events.listen((ev) => _controller.add(switch (ev) {
+      e.value.events.listen((ev) => _emit(switch (ev) {
             ClientJoined(:final connId) => ClientJoined('$p$connId'),
             ClientLeft(:final connId) => ClientLeft('$p$connId'),
             HostReceived(:final connId, :final message) => HostReceived('$p$connId', message),
           }));
+    }
+  }
+
+  void _emit(HostEvent e) {
+    _queue.add(e);
+    if (_draining) return;
+    _draining = true;
+    try {
+      while (_queue.isNotEmpty) {
+        _controller.add(_queue.removeFirst());
+      }
+    } finally {
+      _draining = false;
     }
   }
 

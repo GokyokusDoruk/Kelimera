@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:game_core/game_core.dart';
 import 'package:net_core/net_core.dart';
 import 'package:test/test.dart';
@@ -25,6 +27,48 @@ void main() {
     expect(p2.last<StateMsg>().view.myHand, hand);
     h.sched.advance(const Duration(minutes: 2));
     expect(h.player('p2').status, PlayerStatus.connected);
+  });
+
+  test('geri yükleme sırayı kaydırmaz; 5. turda oyunu bitirmez', () {
+    final h = Harness();
+    h.startWith(3);
+    // Kaydı elle düzenle: sıra [p1(hakem), p2, p3], 5. tur, sıra p2'de.
+    final snap = h.host.toJson();
+    final st = GameState.fromJson(snap['state'] as Map<String, dynamic>);
+    final ordered = [
+      for (final id in ['p1', 'p2', 'p3']) st.players.firstWhere((p) => p.id == id),
+    ];
+    snap['state'] = st.copyWith(players: ordered, round: 5, turnIndex: 1).toJson();
+
+    final h2 = Harness();
+    final restored = GameHost.restore(
+      snapshot: snap,
+      transport: h2.hub,
+      engine: h2.engine,
+      scheduler: h2.sched,
+      random: Random(3),
+    );
+    final s = restored.state!;
+    expect(s.finished, isFalse);
+    expect(s.round, 5);
+    expect(s.current.id, 'p2');
+    expect(s.players[1].status, PlayerStatus.disconnected);
+    // p2 dönmezse sırası yalnızca süre dolunca geçer; kopuk p3 atlanır ve 5. tur biter.
+    h2.sched.advance(const Duration(milliseconds: 45499));
+    expect(restored.state!.finished, isFalse);
+    h2.sched.advance(const Duration(milliseconds: 1));
+    expect(restored.state!.finished, isTrue);
+  });
+
+  test('bir bağlantı başka oyuncu olarak tanıtılırsa eski oyuncunun durumunu almaz', () {
+    final h = Harness();
+    final cs = h.startWith(3);
+    final p3 = byId(cs, 'p3');
+    p3.send(const Hello(PlayerInfo(id: 'p2', name: 'p2', avatar: 0)));
+    final before = p3.all<StateMsg>().length;
+    h.sched.advance(const Duration(milliseconds: 45500)); // sıra değişir → tek yayın
+    expect(p3.all<StateMsg>().length, before + 1);
+    expect(p3.last<StateMsg>().view.myHand, h.player('p2').hand);
   });
 
   test('oyun kopukken biterse geri dönen oyuncu son durumu alır', () {

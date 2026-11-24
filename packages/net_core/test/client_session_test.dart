@@ -114,6 +114,21 @@ void main() {
     expect(voters[1].chat.last, ChatMsg(cur.me.id, 'teşekkürler'));
   });
 
+  test('hakem kaybolunca açık oylama kapanır', () {
+    final h = Harness(dictionary: Dictionary({'AT': 1, 'KALEM': 2}));
+    final links = [h.hub.connect(), h.hub.connect(), h.hub.connect()];
+    final ss = [for (var i = 0; i < 3; i++) session(h, 'p${i + 1}', links[i])];
+    h.host.startGame();
+    final cur = currentOf(h, ss);
+    final letter = cur.view!.myHand.firstWhere((l) => l != 'T');
+    cur.submitMove({const Pos(6, 4): Tile(letter)});
+    cur.proposeWord('A$letter');
+    final voter = ss.firstWhere((s) => s != cur);
+    expect(voter.activeVote, isNotNull);
+    h.hub.drop(links[ss.indexOf(voter)]);
+    expect(voter.activeVote, isNull);
+  });
+
   test('oyun bitince ended', () {
     final h = Harness();
     final a = session(h, 'p1');

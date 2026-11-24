@@ -38,6 +38,12 @@ void main() {
     expect(() => FrameAssembler().add(Uint8List(3)), throwsFormatException);
   });
 
+  test('aynı kimlikle uyumsuz toplam: FormatException, TypeError değil', () {
+    final a = FrameAssembler();
+    expect(a.add(Uint8List.fromList([0, 9, 0, 2, 1])), isNull);
+    expect(() => a.add(Uint8List.fromList([0, 9, 2, 3, 1])), throwsFormatException);
+  });
+
   test('büyük mesaj kimliği 16 bite sarılır', () {
     final f = encodeFrames(0x1FFFF, Uint8List(1), 20).single;
     expect(f.sublist(0, 2), [0xFF, 0xFF]);

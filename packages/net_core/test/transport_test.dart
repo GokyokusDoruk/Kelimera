@@ -60,6 +60,24 @@ void main() {
     expect(got, ['cevap:merhaba']);
   });
 
+  test('MergedHostTransport iç içe olaylarda çökmez, sırayı korur', () {
+    final a = MemoryHub();
+    final b = MemoryHub();
+    final merged = MergedHostTransport({'a': a, 'b': b});
+    final log = <String>[];
+    merged.events.listen((e) {
+      log.add(describe(e));
+      if (e is HostReceived && e.connId.startsWith('a:')) merged.send('b:m1', 'ping');
+    });
+    final cb = b.connect();
+    cb.events.listen((e) {
+      if (e is ClientReceived) cb.send('pong');
+    });
+    final ca = a.connect();
+    ca.send('selam');
+    expect(log, ['joined b:m1', 'joined a:m1', 'recv a:m1 selam', 'recv b:m1 pong']);
+  });
+
   test('MergedHostTransport önek ekler ve doğru parçaya yönlendirir', () {
     final a = MemoryHub();
     final b = MemoryHub();

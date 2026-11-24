@@ -311,6 +311,7 @@ class GameHost {
     if (accepted && !_suggestions.contains(v.word)) {
       _suggestions.add(v.word);
       onSuggestion?.call(v.word);
+      onPersist?.call(toJson()); // öneri hakem çökse de kaybolmasın
     }
     _broadcast(VoteResultMsg(v.id, v.word, accepted));
   }
@@ -348,14 +349,21 @@ class GameHost {
   // --- durum -----------------------------------------------------------------
 
   /// Kayıttan dönüş: hakem dışındaki herkes kopuk sayılır ve yeniden bağlanma penceresi başlar.
+  /// Durumlar doğrudan yazılır, sıra kaydırılmaz: oyun kaldığı yerden sürer (spec §5.10).
+  /// Sıradaki oyuncu dönmezse sırası yalnızca süre dolunca geçer.
   void _restoreState(GameState saved) {
-    var next = saved;
-    for (final p in saved.players) {
-      if (p.id == hostPlayerId || p.status == PlayerStatus.left) continue;
-      next = engine.setStatus(next, p.id, PlayerStatus.disconnected);
-      if (!saved.finished) _startLeaveTimer(p.id);
+    final players = [
+      for (final p in saved.players)
+        p.id == hostPlayerId || p.status == PlayerStatus.left
+            ? p
+            : p.copyWith(status: PlayerStatus.disconnected),
+    ];
+    if (!saved.finished) {
+      for (final p in players) {
+        if (p.status == PlayerStatus.disconnected) _startLeaveTimer(p.id);
+      }
     }
-    _apply(next);
+    _apply(saved.copyWith(players: players));
   }
 
   void _apply(GameState next) {
@@ -394,6 +402,12 @@ class GameHost {
   LobbyMsg _lobbyMsg() => LobbyMsg(_roomCode, hostPlayerId, List.of(_lobby));
 
   void _bind(String connId, String playerId) {
+    // Bağlantı daha önce başka bir oyuncu olarak tanıtıldıysa o eşleme kalkar:
+    // bir bağlantı asla iki oyuncunun durumunu (elini) almaz.
+    final previous = _connToPlayer[connId];
+    if (previous != null && previous != playerId && _playerConn[previous] == connId) {
+      _playerConn.remove(previous);
+    }
     final old = _playerConn[playerId];
     if (old != null) _connToPlayer.remove(old);
     _connToPlayer[connId] = playerId;

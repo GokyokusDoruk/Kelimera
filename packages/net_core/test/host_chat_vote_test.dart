@@ -69,6 +69,19 @@ void main() {
       expect(h.suggested, [word]);
     });
 
+    test('kabul edilen öneri hemen kaydedilir', () {
+      final h = voteHarness();
+      final cs = h.startWith(3);
+      final (cur, word) = rejectedWord(h, cs);
+      cur.send(ProposeWordMsg(word));
+      final saved = h.persistCount;
+      for (final v in others(cs, cur)) {
+        v.send(const VoteMsg('v1', true));
+      }
+      expect(h.persistCount, saved + 1);
+      expect(h.lastSnapshot!['suggestions'], [word]);
+    });
+
     test('bir evet bir hayır: ret', () {
       final h = voteHarness();
       final cs = h.startWith(3);

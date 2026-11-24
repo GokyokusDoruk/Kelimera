@@ -88,6 +88,9 @@ class ClientSession {
   }
 
   void _onLinkDown() {
+    // Hakemle bağ koptu: açık oylamanın sonucu bu bağlantıdan gelmeyecek.
+    final hadVote = activeVote != null;
+    activeVote = null;
     switch (phase) {
       case ClientPhase.playing:
         phase = ClientPhase.hostLost;
@@ -101,7 +104,7 @@ class ClientSession {
       case ClientPhase.lobby:
         phase = ClientPhase.connecting;
       default:
-        return;
+        if (!hadVote) return;
     }
     _notify();
   }
