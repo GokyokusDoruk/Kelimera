@@ -1,0 +1,14 @@
+name: net_core
+description: Kelimera hakem/istemci ağ mantığı (saf Dart).
+version: 0.1.0
+publish_to: none
+
+environment:
+  sdk: ^3.6.0
+
+dependencies:
+  game_core:
+    path: ../game_core
+dev_dependencies:
+  lints: ^6.1.0
+  test: ^1.33.0
