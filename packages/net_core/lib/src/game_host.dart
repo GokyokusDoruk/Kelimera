@@ -25,6 +25,8 @@ class GameHost {
   final Map<String, String> _playerConn = {};
   final List<String> _suggestions = [];
   GameState? _state;
+  DateTime? _deadline;
+  Cancelable? _turnTimer;
   late final StreamSubscription<HostEvent> _sub;
 
   void Function(Map<String, dynamic> snapshot)? onPersist;
@@ -88,6 +90,7 @@ class GameHost {
 
   void dispose() {
     _sub.cancel();
+    _turnTimer?.cancel();
   }
 
   // --- olaylar ---------------------------------------------------------------
@@ -162,11 +165,73 @@ class GameHost {
 
   void _onMessage(String playerId, NetMessage m) {
     switch (m) {
+      case MoveMsg(:final placements):
+        _onMove(playerId, placements);
+      case SwapAllMsg():
+        _onSwapAll(playerId);
       case PingMsg():
         _sendToPlayer(playerId, const PongMsg());
       default:
         break;
     }
+  }
+
+  void _onMove(String playerId, Map<Pos, Tile> placements) {
+    final s = _state;
+    if (s == null) return;
+    switch (engine.submitMove(s, playerId, placements)) {
+      case MoveRejected(:final reasons):
+        _onRejected(playerId, reasons);
+        _sendToPlayer(playerId, MoveResultMsg(false, 0, reasons));
+      case MoveAccepted(state: final next, :final score):
+        _sendToPlayer(playerId, MoveResultMsg(true, score.total, const []));
+        _apply(next);
+    }
+  }
+
+  void _onSwapAll(String playerId) {
+    final s = _state;
+    if (s == null) return;
+    if (s.finished) {
+      _sendToPlayer(playerId, const MoveResultMsg(false, 0, [GameFinished()]));
+    } else if (s.current.id != playerId) {
+      _sendToPlayer(playerId, const MoveResultMsg(false, 0, [NotYourTurn()]));
+    } else {
+      _sendToPlayer(playerId, const MoveResultMsg(true, 0, []));
+      _apply(engine.swapAll(s, playerId));
+    }
+  }
+
+  /// Oylama için bu sıradaki reddedilen kelimeleri saklar (Görev 9).
+  void _onRejected(String playerId, List<RejectReason> reasons) {}
+
+  void _onTurnTimeout() {
+    _turnTimer = null;
+    final s = _state;
+    if (s == null) return;
+    final next = engine.timeout(s);
+    if (identical(next, s)) {
+      _deadline = null; // bağlı oyuncu yok: oyun bekler
+      return;
+    }
+    _apply(next);
+  }
+
+  void _restartTurnTimer() {
+    _turnTimer?.cancel();
+    _turnTimer = null;
+    final s = _state;
+    if (s == null || s.finished) {
+      _deadline = null;
+      return;
+    }
+    _deadline = scheduler.now().add(config.turnDuration);
+    _turnTimer = scheduler.after(config.turnDuration + config.moveGrace, _onTurnTimeout);
+  }
+
+  /// Sıra değiştiğinde (yeni tur/sıra ya da bitiş) çağrılır.
+  void _onTurnChanged() {
+    _restartTurnTimer();
   }
 
   // --- durum -----------------------------------------------------------------
@@ -176,13 +241,23 @@ class GameHost {
   }
 
   void _apply(GameState next) {
-    if (identical(next, _state)) return;
+    final prev = _state;
+    if (identical(next, prev)) return;
     _state = next;
+    final turnChanged = prev == null ||
+        prev.round != next.round ||
+        prev.turnIndex != next.turnIndex ||
+        prev.finished != next.finished;
+    if (turnChanged) _onTurnChanged();
     _broadcastState();
     onPersist?.call(toJson());
   }
 
-  int _remainingMs() => 0;
+  int _remainingMs() {
+    final d = _deadline;
+    if (d == null) return 0;
+    return max(0, d.difference(scheduler.now()).inMilliseconds);
+  }
 
   void _sendState(String playerId) {
     final s = _state;
