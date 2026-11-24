@@ -1,6 +1,7 @@
 /// Kelimera hakem/istemci ağ mantığı.
 library;
 
+export 'src/client_session.dart';
 export 'src/framing.dart';
 export 'src/game_host.dart';
 export 'src/host_config.dart';

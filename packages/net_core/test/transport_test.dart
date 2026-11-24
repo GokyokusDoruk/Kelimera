@@ -45,6 +45,21 @@ void main() {
     expect(hostLog.last, 'joined m2');
   });
 
+  test('olay işleyicisinin içinden gönderilen mesajın cevabı da senkron gelir', () {
+    final hub = MemoryHub();
+    hub.events.listen((e) {
+      if (e is HostReceived) hub.send(e.connId, 'cevap:${e.message}');
+    });
+    final c = hub.connect();
+    final got = <String>[];
+    c.events.listen((e) {
+      if (e is LinkUp) c.send('merhaba');
+      if (e is ClientReceived) got.add(e.message);
+    });
+    hub.reconnect(c);
+    expect(got, ['cevap:merhaba']);
+  });
+
   test('MergedHostTransport önek ekler ve doğru parçaya yönlendirir', () {
     final a = MemoryHub();
     final b = MemoryHub();
