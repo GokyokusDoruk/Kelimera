@@ -39,7 +39,8 @@ class Hello extends NetMessage {
   @override
   Map<String, dynamic> fields() => {'player': player.toJson(), 'protocol': protocol};
   @override
-  bool operator ==(Object o) => o is Hello && o.player == player && o.protocol == protocol;
+  bool operator ==(Object other) =>
+      other is Hello && other.player == player && other.protocol == protocol;
   @override
   int get hashCode => Object.hash(player, protocol);
 }
@@ -52,7 +53,7 @@ class Welcome extends NetMessage {
   @override
   Map<String, dynamic> fields() => {'playerId': playerId};
   @override
-  bool operator ==(Object o) => o is Welcome && o.playerId == playerId;
+  bool operator ==(Object other) => other is Welcome && other.playerId == playerId;
   @override
   int get hashCode => playerId.hashCode;
 }
@@ -65,7 +66,7 @@ class JoinRejected extends NetMessage {
   @override
   Map<String, dynamic> fields() => {'code': code.name};
   @override
-  bool operator ==(Object o) => o is JoinRejected && o.code == code;
+  bool operator ==(Object other) => other is JoinRejected && other.code == code;
   @override
   int get hashCode => code.hashCode;
 }
@@ -84,8 +85,11 @@ class LobbyMsg extends NetMessage {
         'players': [for (final p in players) p.toJson()],
       };
   @override
-  bool operator ==(Object o) =>
-      o is LobbyMsg && o.roomCode == roomCode && o.hostId == hostId && _listEq(o.players, players);
+  bool operator ==(Object other) =>
+      other is LobbyMsg &&
+      other.roomCode == roomCode &&
+      other.hostId == hostId &&
+      _listEq(other.players, players);
   @override
   int get hashCode => Object.hash(roomCode, hostId, Object.hashAll(players));
 }
@@ -98,7 +102,7 @@ class StateMsg extends NetMessage {
   @override
   Map<String, dynamic> fields() => {'view': view.toJson()};
   @override
-  bool operator ==(Object o) => o is StateMsg && o.view == view;
+  bool operator ==(Object other) => other is StateMsg && other.view == view;
   @override
   int get hashCode => view.hashCode;
 }
@@ -116,9 +120,10 @@ class MoveMsg extends NetMessage {
         ],
       };
   @override
-  bool operator ==(Object o) => o is MoveMsg && _mapEq(o.placements, placements);
+  bool operator ==(Object other) => other is MoveMsg && _mapEq(other.placements, placements);
   @override
-  int get hashCode => Object.hashAllUnordered(placements.entries.map((e) => Object.hash(e.key, e.value)));
+  int get hashCode =>
+      Object.hashAllUnordered(placements.entries.map((e) => Object.hash(e.key, e.value)));
 }
 
 class SwapAllMsg extends NetMessage {
@@ -128,7 +133,7 @@ class SwapAllMsg extends NetMessage {
   @override
   Map<String, dynamic> fields() => {};
   @override
-  bool operator ==(Object o) => o is SwapAllMsg;
+  bool operator ==(Object other) => other is SwapAllMsg;
   @override
   int get hashCode => 11;
 }
@@ -147,8 +152,11 @@ class MoveResultMsg extends NetMessage {
         'reasons': [for (final r in reasons) rejectReasonToJson(r)],
       };
   @override
-  bool operator ==(Object o) =>
-      o is MoveResultMsg && o.accepted == accepted && o.points == points && _listEq(o.reasons, reasons);
+  bool operator ==(Object other) =>
+      other is MoveResultMsg &&
+      other.accepted == accepted &&
+      other.points == points &&
+      _listEq(other.reasons, reasons);
   @override
   int get hashCode => Object.hash(accepted, points, Object.hashAll(reasons));
   @override
@@ -163,7 +171,7 @@ class ProposeWordMsg extends NetMessage {
   @override
   Map<String, dynamic> fields() => {'word': word};
   @override
-  bool operator ==(Object o) => o is ProposeWordMsg && o.word == word;
+  bool operator ==(Object other) => other is ProposeWordMsg && other.word == word;
   @override
   int get hashCode => word.hashCode;
 }
@@ -180,12 +188,12 @@ class VoteStartMsg extends NetMessage {
   Map<String, dynamic> fields() =>
       {'voteId': voteId, 'word': word, 'proposerId': proposerId, 'durationMs': durationMs};
   @override
-  bool operator ==(Object o) =>
-      o is VoteStartMsg &&
-      o.voteId == voteId &&
-      o.word == word &&
-      o.proposerId == proposerId &&
-      o.durationMs == durationMs;
+  bool operator ==(Object other) =>
+      other is VoteStartMsg &&
+      other.voteId == voteId &&
+      other.word == word &&
+      other.proposerId == proposerId &&
+      other.durationMs == durationMs;
   @override
   int get hashCode => Object.hash(voteId, word, proposerId, durationMs);
 }
@@ -199,7 +207,7 @@ class VoteMsg extends NetMessage {
   @override
   Map<String, dynamic> fields() => {'voteId': voteId, 'yes': yes};
   @override
-  bool operator ==(Object o) => o is VoteMsg && o.voteId == voteId && o.yes == yes;
+  bool operator ==(Object other) => other is VoteMsg && other.voteId == voteId && other.yes == yes;
   @override
   int get hashCode => Object.hash(voteId, yes);
 }
@@ -214,8 +222,11 @@ class VoteResultMsg extends NetMessage {
   @override
   Map<String, dynamic> fields() => {'voteId': voteId, 'word': word, 'accepted': accepted};
   @override
-  bool operator ==(Object o) =>
-      o is VoteResultMsg && o.voteId == voteId && o.word == word && o.accepted == accepted;
+  bool operator ==(Object other) =>
+      other is VoteResultMsg &&
+      other.voteId == voteId &&
+      other.word == word &&
+      other.accepted == accepted;
   @override
   int get hashCode => Object.hash(voteId, word, accepted);
   @override
@@ -231,7 +242,8 @@ class ChatMsg extends NetMessage {
   @override
   Map<String, dynamic> fields() => {'fromId': fromId, 'text': text};
   @override
-  bool operator ==(Object o) => o is ChatMsg && o.fromId == fromId && o.text == text;
+  bool operator ==(Object other) =>
+      other is ChatMsg && other.fromId == fromId && other.text == text;
   @override
   int get hashCode => Object.hash(fromId, text);
   @override
@@ -245,7 +257,7 @@ class PingMsg extends NetMessage {
   @override
   Map<String, dynamic> fields() => {};
   @override
-  bool operator ==(Object o) => o is PingMsg;
+  bool operator ==(Object other) => other is PingMsg;
   @override
   int get hashCode => 12;
 }
@@ -257,7 +269,7 @@ class PongMsg extends NetMessage {
   @override
   Map<String, dynamic> fields() => {};
   @override
-  bool operator ==(Object o) => o is PongMsg;
+  bool operator ==(Object other) => other is PongMsg;
   @override
   int get hashCode => 13;
 }
@@ -275,7 +287,8 @@ NetMessage? decodeMessage(String s) {
       'welcome' => Welcome(j['playerId'] as String),
       'joinRejected' => JoinRejected(JoinRejectCode.values.byName(j['code'] as String)),
       'lobby' => LobbyMsg(j['roomCode'] as String, j['hostId'] as String, [
-          for (final p in (j['players'] as List).cast<Map<String, dynamic>>()) PlayerInfo.fromJson(p),
+          for (final p in (j['players'] as List).cast<Map<String, dynamic>>())
+            PlayerInfo.fromJson(p),
         ]),
       'state' => StateMsg(PlayerView.fromJson(j['view'] as Map<String, dynamic>)),
       'move' => MoveMsg({
@@ -284,7 +297,8 @@ NetMessage? decodeMessage(String s) {
         }),
       'swapAll' => const SwapAllMsg(),
       'moveResult' => MoveResultMsg(j['accepted'] as bool, j['points'] as int, [
-          for (final r in (j['reasons'] as List).cast<Map<String, dynamic>>()) rejectReasonFromJson(r),
+          for (final r in (j['reasons'] as List).cast<Map<String, dynamic>>())
+            rejectReasonFromJson(r),
         ]),
       'proposeWord' => ProposeWordMsg(j['word'] as String),
       'voteStart' => VoteStartMsg(j['voteId'] as String, j['word'] as String,
