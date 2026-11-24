@@ -28,6 +28,9 @@ class GameHost {
   DateTime? _deadline;
   Cancelable? _turnTimer;
   final Map<String, Cancelable> _leaveTimers = {};
+  final Map<String, List<String>> _unknownThisTurn = {};
+  _Vote? _vote;
+  int _voteSeq = 0;
   late final StreamSubscription<HostEvent> _sub;
 
   void Function(Map<String, dynamic> snapshot)? onPersist;
@@ -96,6 +99,8 @@ class GameHost {
       t.cancel();
     }
     _leaveTimers.clear();
+    _vote?.timer.cancel();
+    _vote = null;
   }
 
   // --- olaylar ---------------------------------------------------------------
@@ -183,8 +188,13 @@ class GameHost {
     _startLeaveTimer(id);
   }
 
-  /// Oylama gibi oyuncuya bağlı süreçler için kanca (Görev 9).
-  void _onPlayerDisconnected(String id) {}
+  /// Oylama sürerken kopan oy veren "hayır" sayılır.
+  void _onPlayerDisconnected(String id) {
+    final v = _vote;
+    if (v == null || !v.voters.contains(id) || v.ballots.containsKey(id)) return;
+    v.ballots[id] = false;
+    if (v.ballots.length == v.voters.length) _finishVote();
+  }
 
   void _startLeaveTimer(String id) {
     _leaveTimers.remove(id)?.cancel();
@@ -201,6 +211,12 @@ class GameHost {
         _onMove(playerId, placements);
       case SwapAllMsg():
         _onSwapAll(playerId);
+      case ChatMsg(:final text):
+        _onChat(playerId, text);
+      case ProposeWordMsg(:final word):
+        _onPropose(playerId, word);
+      case VoteMsg(:final voteId, :final yes):
+        _onVote(playerId, voteId, yes);
       case PingMsg():
         _sendToPlayer(playerId, const PongMsg());
       default:
@@ -234,8 +250,65 @@ class GameHost {
     }
   }
 
-  /// Oylama için bu sıradaki reddedilen kelimeleri saklar (Görev 9).
-  void _onRejected(String playerId, List<RejectReason> reasons) {}
+  /// Oylama için bu sıradaki reddedilen kelimeleri saklar.
+  void _onRejected(String playerId, List<RejectReason> reasons) {
+    for (final r in reasons) {
+      if (r is UnknownWords) _unknownThisTurn[playerId] = List.of(r.words);
+    }
+  }
+
+  // --- sohbet ve oylama --------------------------------------------------------
+
+  void _onChat(String playerId, String raw) {
+    var text = raw.trim();
+    if (text.isEmpty) return;
+    final runes = text.runes;
+    if (runes.length > config.chatMaxLength) {
+      text = String.fromCharCodes(runes.take(config.chatMaxLength));
+    }
+    _broadcast(ChatMsg(playerId, text));
+  }
+
+  void _onPropose(String playerId, String word) {
+    final s = _state;
+    if (s == null || s.finished || _vote != null) return;
+    if (s.current.id != playerId) return;
+    if (!(_unknownThisTurn[playerId]?.contains(word) ?? false)) return;
+
+    final voteId = 'v${++_voteSeq}';
+    final voters = {
+      for (final p in s.players)
+        if (p.id != playerId && p.status == PlayerStatus.connected) p.id,
+    };
+    if (voters.isEmpty) {
+      _broadcast(VoteResultMsg(voteId, word, false));
+      return;
+    }
+    _broadcast(VoteStartMsg(voteId, word, playerId, config.voteDuration.inMilliseconds));
+    _vote = _Vote(voteId, word, voters, scheduler.after(config.voteDuration, _finishVote));
+  }
+
+  void _onVote(String playerId, String voteId, bool yes) {
+    final v = _vote;
+    if (v == null || v.id != voteId) return;
+    if (!v.voters.contains(playerId) || v.ballots.containsKey(playerId)) return;
+    v.ballots[playerId] = yes;
+    if (v.ballots.length == v.voters.length) _finishVote();
+  }
+
+  void _finishVote() {
+    final v = _vote;
+    if (v == null) return;
+    _vote = null;
+    v.timer.cancel();
+    final yes = v.ballots.values.where((b) => b).length;
+    final accepted = yes * 2 > v.voters.length;
+    if (accepted && !_suggestions.contains(v.word)) {
+      _suggestions.add(v.word);
+      onSuggestion?.call(v.word);
+    }
+    _broadcast(VoteResultMsg(v.id, v.word, accepted));
+  }
 
   void _onTurnTimeout() {
     _turnTimer = null;
@@ -263,6 +336,7 @@ class GameHost {
 
   /// Sıra değiştiğinde (yeni tur/sıra ya da bitiş) çağrılır.
   void _onTurnChanged() {
+    _unknownThisTurn.clear();
     _restartTurnTimer();
   }
 
@@ -334,4 +408,13 @@ class GameHost {
       transport.send(c, text);
     }
   }
+}
+
+class _Vote {
+  final String id;
+  final String word;
+  final Set<String> voters;
+  final Cancelable timer;
+  final Map<String, bool> ballots = {};
+  _Vote(this.id, this.word, this.voters, this.timer);
 }
