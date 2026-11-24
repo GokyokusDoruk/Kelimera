@@ -2,3 +2,4 @@
 library;
 
 export 'src/fake_scheduler.dart';
+export 'src/memory_transport.dart';
