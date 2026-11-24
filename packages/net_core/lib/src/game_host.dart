@@ -27,6 +27,7 @@ class GameHost {
   GameState? _state;
   DateTime? _deadline;
   Cancelable? _turnTimer;
+  final Map<String, Cancelable> _leaveTimers = {};
   late final StreamSubscription<HostEvent> _sub;
 
   void Function(Map<String, dynamic> snapshot)? onPersist;
@@ -91,6 +92,10 @@ class GameHost {
   void dispose() {
     _sub.cancel();
     _turnTimer?.cancel();
+    for (final t in _leaveTimers.values) {
+      t.cancel();
+    }
+    _leaveTimers.clear();
   }
 
   // --- olaylar ---------------------------------------------------------------
@@ -147,20 +152,47 @@ class GameHost {
 
   /// Oyun sırasında bilinen bir oyuncunun yeniden bağlanması.
   void _rejoin(String connId, PlayerState p) {
+    if (p.status == PlayerStatus.left) {
+      _sendTo(connId, const JoinRejected(JoinRejectCode.playerLeft));
+      return;
+    }
+    _leaveTimers.remove(p.id)?.cancel();
     _bind(connId, p.id);
     _sendTo(connId, Welcome(p.id));
     _sendTo(connId, _lobbyMsg());
-    _sendState(p.id);
+    if (p.status == PlayerStatus.connected) {
+      _sendState(p.id);
+    } else {
+      _apply(engine.setStatus(_state!, p.id, PlayerStatus.connected));
+    }
   }
 
   void _onLeft(String connId) {
     final id = _connToPlayer.remove(connId);
     if (id == null) return; // eski (güncel olmayan) bağlantı ya da kimliksiz
     _playerConn.remove(id);
-    if (_state == null) {
+    final s = _state;
+    if (s == null) {
       _lobby.removeWhere((p) => p.id == id);
       _broadcast(_lobbyMsg());
+      return;
     }
+    _onPlayerDisconnected(id);
+    if (s.finished) return;
+    _apply(engine.setStatus(s, id, PlayerStatus.disconnected));
+    _startLeaveTimer(id);
+  }
+
+  /// Oylama gibi oyuncuya bağlı süreçler için kanca (Görev 9).
+  void _onPlayerDisconnected(String id) {}
+
+  void _startLeaveTimer(String id) {
+    _leaveTimers.remove(id)?.cancel();
+    _leaveTimers[id] = scheduler.after(config.reconnectWindow, () {
+      _leaveTimers.remove(id);
+      final s = _state;
+      if (s != null) _apply(engine.setStatus(s, id, PlayerStatus.left));
+    });
   }
 
   void _onMessage(String playerId, NetMessage m) {
@@ -236,8 +268,15 @@ class GameHost {
 
   // --- durum -----------------------------------------------------------------
 
-  void _restoreState(GameState s) {
-    _state = s;
+  /// Kayıttan dönüş: hakem dışındaki herkes kopuk sayılır ve yeniden bağlanma penceresi başlar.
+  void _restoreState(GameState saved) {
+    var next = saved;
+    for (final p in saved.players) {
+      if (p.id == hostPlayerId || p.status == PlayerStatus.left) continue;
+      next = engine.setStatus(next, p.id, PlayerStatus.disconnected);
+      if (!saved.finished) _startLeaveTimer(p.id);
+    }
+    _apply(next);
   }
 
   void _apply(GameState next) {
