@@ -27,6 +27,21 @@ void main() {
     expect(h.player('p2').status, PlayerStatus.connected);
   });
 
+  test('oyun kopukken biterse geri dönen oyuncu son durumu alır', () {
+    final h = Harness();
+    final cs = h.startWith(3);
+    final p2 = byId(cs, 'p2');
+    h.hub.drop(p2.link);
+    while (!h.state.finished) {
+      h.current(cs).send(const SwapAllMsg()); // 2 dk dolmadan oyunu bitir
+    }
+    expect(h.player('p2').status, PlayerStatus.disconnected);
+    h.hub.reconnect(p2.link);
+    p2.hello();
+    expect(p2.last<StateMsg>().view.finished, isTrue);
+    expect(p2.last<StateMsg>().view.winners, isNotEmpty);
+  });
+
   test('2 dk dolunca ayrılır, sonra geri dönemez', () {
     final h = Harness();
     final cs = h.startWith(3);

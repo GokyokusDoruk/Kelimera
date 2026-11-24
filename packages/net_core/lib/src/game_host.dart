@@ -165,10 +165,15 @@ class GameHost {
     _bind(connId, p.id);
     _sendTo(connId, Welcome(p.id));
     _sendTo(connId, _lobbyMsg());
-    if (p.status == PlayerStatus.connected) {
+    final s = _state!;
+    final next = p.status == PlayerStatus.connected
+        ? s
+        : engine.setStatus(s, p.id, PlayerStatus.connected);
+    if (identical(next, s)) {
+      // Durum değişmedi (zaten bağlı ya da oyun bitti): dönen oyuncuya yine de son durumu gönder.
       _sendState(p.id);
     } else {
-      _apply(engine.setStatus(_state!, p.id, PlayerStatus.connected));
+      _apply(next);
     }
   }
 
